@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI RAG</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <header class="brand">
+          <div>
+            <h1>AI RAG</h1>
+            <p>本地知识库问答</p>
+          </div>
+          <button id="refreshDocuments" class="icon-button" type="button" title="刷新">↻</button>
+        </header>
+
+        <section class="side-section">
+          <div class="section-title">
+            <h2>文档</h2>
+          </div>
+          <form id="uploadForm" class="upload-form">
+            <label class="file-picker">
+              <input id="fileInput" type="file" name="file" accept=".pdf,.docx,.txt,.md,.markdown" />
+              <span>选择文件</span>
+            </label>
+            <button class="primary-button" type="submit">上传并索引</button>
+          </form>
+          <p id="uploadStatus" class="status-line"></p>
+          <div id="documentList" class="document-list"></div>
+        </section>
+
+        <section class="side-section history-section">
+          <div class="section-title">
+            <h2>历史</h2>
+            <span id="historyCount"></span>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </section>
+      </aside>
+
+      <section class="chat-pane">
+        <header class="chat-header">
+          <div>
+            <h2>知识库问答</h2>
+            <p id="answerStatus">准备就绪</p>
+          </div>
+          <button id="newConversation" class="secondary-button" type="button">新对话</button>
+        </header>
+
+        <section id="conversation" class="conversation">
+          <div class="empty-state">
+            <h3>开始一次检索式问答</h3>
+            <p>上传文档后，直接在下方输入问题。回答会保留引用来源，方便回看依据。</p>
+          </div>
+        </section>
+
+        <form id="queryForm" class="composer">
+          <textarea id="questionInput" rows="3" placeholder="输入你的问题"></textarea>
+          <div class="composer-actions">
+            <label class="topk-control">
+              <span>Top K</span>
+              <input id="topKInput" type="number" min="1" max="20" value="5" />
+            </label>
+            <button class="primary-button send-button" type="submit">发送</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
