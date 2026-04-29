@@ -582,7 +582,9 @@ function renderCitations(citations) {
           <span class="citation-score">${escapeHtml(score)}</span>
         </div>
         ${media}
-        <div class="citation-text">${escapeHtml(c.text)}</div>
+        <div class="citation-text${c.content_type === "table" ? " citation-table" : ""}">
+          ${c.content_type === "table" ? renderMarkdown(c.text) : escapeHtml(c.text)}
+        </div>
       </article>`;
   }).join("");
 
@@ -640,7 +642,8 @@ function renderMarkdown(value) {
     if (list.length) { blocks.push(`<ul>${list.map((li) => `<li>${renderInlineMarkdown(li)}</li>`).join("")}</ul>`); list = []; }
   };
 
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
     if (line.trim().startsWith("```")) {
       if (inCode) { blocks.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`); codeLines = []; inCode = false; }
       else { flush(); inCode = true; }
@@ -678,6 +681,17 @@ function renderMarkdown(value) {
       blocks.push(renderMarkdownImage(image[2], image[1]));
       continue;
     }
+    if (isMarkdownTableStart(lines, index)) {
+      flush();
+      const tableLines = [];
+      while (index < lines.length && looksLikeTableLine(lines[index])) {
+        tableLines.push(lines[index]);
+        index += 1;
+      }
+      index -= 1;
+      blocks.push(renderMarkdownTable(tableLines));
+      continue;
+    }
     const heading = line.match(/^(#{1,6})\s+(.+)$/);
     if (heading) {
       flush();
@@ -709,6 +723,71 @@ function renderMarkdownImage(url, alt) {
         <img src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" loading="lazy">
       </a>
     </figure>`;
+}
+
+function renderMarkdownTable(lines) {
+  if (lines.length < 2) {
+    return `<p>${renderInlineMarkdown(lines.join(" "))}</p>`;
+  }
+
+  const header = parseTableRow(lines[0]);
+  const alignments = parseTableRow(lines[1]).map((cell) => {
+    const value = cell.trim();
+    if (value.startsWith(":") && value.endsWith(":")) return "center";
+    if (value.endsWith(":")) return "right";
+    return "left";
+  });
+  const bodyRows = lines.slice(2).map(parseTableRow).filter((row) => row.length);
+
+  const renderCell = (cell, cellIndex, tag) => {
+    const align = alignments[cellIndex] || "left";
+    return `<${tag} style="text-align:${align}">${renderInlineMarkdown(cell)}</${tag}>`;
+  };
+
+  const thead = `<thead><tr>${header.map((cell, i) => renderCell(cell, i, "th")).join("")}</tr></thead>`;
+  const tbody = bodyRows.length
+    ? `<tbody>${bodyRows.map((row) => `<tr>${row.map((cell, i) => renderCell(cell, i, "td")).join("")}</tr>`).join("")}</tbody>`
+    : "";
+  return `<div class="markdown-table-wrap"><table>${thead}${tbody}</table></div>`;
+}
+
+function isMarkdownTableStart(lines, index) {
+  return (
+    index + 1 < lines.length &&
+    looksLikeTableLine(lines[index]) &&
+    isMarkdownTableSeparator(lines[index + 1])
+  );
+}
+
+function looksLikeTableLine(line) {
+  return String(line ?? "").trim().split("|").length >= 3;
+}
+
+function isMarkdownTableSeparator(line) {
+  const cells = parseTableRow(line);
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
+}
+
+function parseTableRow(line) {
+  let value = String(line ?? "").trim();
+  if (value.startsWith("|")) value = value.slice(1);
+  if (value.endsWith("|")) value = value.slice(0, -1);
+  const cells = [];
+  let current = "";
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === "\\" && value[index + 1] === "|") {
+      current += "|";
+      index += 1;
+    } else if (char === "|") {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
 }
 
 function renderInlineMarkdown(value) {

@@ -112,6 +112,7 @@ def _document_ids_for_request(request: QueryRequest) -> list[str] | None:
 def _citation_from_chunk(chunk: dict) -> dict:
     metadata = chunk.get("metadata", {})
     content_type = metadata.get("content_type", "body")
+    text_limit = 4000 if content_type == "table" else 500
     return {
         "document_id": chunk["document_id"],
         "chunk_id": chunk["id"],
@@ -122,7 +123,7 @@ def _citation_from_chunk(chunk: dict) -> dict:
         "content_type": content_type,
         "image_url": metadata.get("image_url") if content_type == "figure" else None,
         "caption": metadata.get("caption") if content_type == "figure" else None,
-        "text": chunk["content"][:500],
+        "text": chunk["content"][:text_limit],
     }
 
 

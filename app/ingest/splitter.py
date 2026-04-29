@@ -62,29 +62,63 @@ def split_pages(
             content_type = _content_type_for_section(section_title)
             if content_type == "references":
                 continue
-            start = 0
-            while start < len(section_text):
-                end = _choose_chunk_end(section_text, start, size)
-                content = section_text[start:end].strip()
-                if content and _is_useful_chunk(content):
-                    chunks.append(
-                        {
-                            "id": str(uuid4()),
-                            "document_id": document_id,
-                            "content": content,
-                            "chunk_index": len(chunks),
-                            "page_number": page.get("page_number"),
-                            "source_name": source_name,
-                            "metadata": {
-                                "section_title": section_title,
-                                "content_type": content_type,
-                            },
-                        }
+            for segment_type, segment_text in _split_markdown_table_segments(section_text):
+                if segment_type == "table":
+                    _append_chunk(
+                        chunks,
+                        content=segment_text,
+                        document_id=document_id,
+                        page_number=page.get("page_number"),
+                        source_name=source_name,
+                        section_title=section_title,
+                        content_type="table",
                     )
-                if start + size >= len(section_text):
-                    break
-                start = max(end - overlap, start + 1)
+                    continue
+
+                start = 0
+                while start < len(segment_text):
+                    end = _choose_chunk_end(segment_text, start, size)
+                    content = segment_text[start:end].strip()
+                    if content and _is_useful_chunk(content):
+                        _append_chunk(
+                            chunks,
+                            content=content,
+                            document_id=document_id,
+                            page_number=page.get("page_number"),
+                            source_name=source_name,
+                            section_title=section_title,
+                            content_type=content_type,
+                        )
+                    if start + size >= len(segment_text):
+                        break
+                    start = max(end - overlap, start + 1)
     return chunks
+
+
+def _append_chunk(
+    chunks: list[dict],
+    *,
+    content: str,
+    document_id: str,
+    page_number: int | None,
+    source_name: str,
+    section_title: str | None,
+    content_type: str,
+) -> None:
+    chunks.append(
+        {
+            "id": str(uuid4()),
+            "document_id": document_id,
+            "content": content,
+            "chunk_index": len(chunks),
+            "page_number": page_number,
+            "source_name": source_name,
+            "metadata": {
+                "section_title": section_title,
+                "content_type": content_type,
+            },
+        }
+    )
 
 
 def _merge_wrapped_lines(text: str) -> str:
@@ -191,6 +225,63 @@ def _split_into_sections(text: str) -> list[tuple[str | None, str]]:
         for title, lines in sections
         if "\n".join(lines).strip()
     ]
+
+
+def _split_markdown_table_segments(text: str) -> list[tuple[str, str]]:
+    lines = text.splitlines()
+    segments: list[tuple[str, str]] = []
+    buffer: list[str] = []
+    index = 0
+
+    while index < len(lines):
+        if _is_markdown_table_start(lines, index):
+            caption = _pop_table_caption(buffer)
+            if buffer:
+                segments.append(("text", "\n".join(buffer).strip()))
+                buffer = []
+
+            table_lines = caption
+            while index < len(lines) and _looks_like_table_line(lines[index]):
+                table_lines.append(lines[index])
+                index += 1
+            segments.append(("table", "\n".join(table_lines).strip()))
+            continue
+
+        buffer.append(lines[index])
+        index += 1
+
+    if buffer:
+        segments.append(("text", "\n".join(buffer).strip()))
+    return [(kind, value) for kind, value in segments if value]
+
+
+def _is_markdown_table_start(lines: list[str], index: int) -> bool:
+    if index + 1 >= len(lines):
+        return False
+    return _looks_like_table_line(lines[index]) and _is_markdown_table_separator(lines[index + 1])
+
+
+def _looks_like_table_line(line: str) -> bool:
+    stripped = line.strip()
+    return stripped.count("|") >= 2
+
+
+def _is_markdown_table_separator(line: str) -> bool:
+    stripped = line.strip().strip("|")
+    if not stripped:
+        return False
+    cells = [cell.strip() for cell in stripped.split("|")]
+    return all(re.match(r"^:?-{3,}:?$", cell) for cell in cells)
+
+
+def _pop_table_caption(buffer: list[str]) -> list[str]:
+    if not buffer:
+        return []
+    caption = buffer[-1].strip()
+    if re.match(r"^(table|tab\.|表)\s*\d*[:：.]?", caption, re.I):
+        buffer.pop()
+        return [caption]
+    return []
 
 
 def _normalize_heading(line: str) -> str:
