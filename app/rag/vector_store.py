@@ -50,6 +50,7 @@ class QdrantVectorStore:
         await self.ensure_collection(vector_size=len(vectors[0]))
         points = []
         for chunk, vector in zip(chunks, vectors, strict=True):
+            metadata = chunk.get("metadata", {})
             points.append(
                 {
                     "id": chunk["id"],
@@ -59,6 +60,7 @@ class QdrantVectorStore:
                         "chunk_id": chunk["id"],
                         "source_name": chunk["source_name"],
                         "page_number": chunk.get("page_number"),
+                        "content_type": metadata.get("content_type", "body"),
                     },
                 }
             )

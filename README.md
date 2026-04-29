@@ -33,6 +33,93 @@
 - [本地运行说明](docs/deployment.md)
 - [开发计划](docs/development-plan.md)
 
+## 本地启动
+
+启动 Qdrant：
+
+```bash
+mkdir -p data/qdrant
+docker run -d \
+  --name ai-rag-qdrant \
+  -p 6333:6333 \
+  -p 6334:6334 \
+  -v "$(pwd)/data/qdrant:/qdrant/storage" \
+  qdrant/qdrant:latest
+```
+
+安装依赖并检查配置：
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python scripts/check_config.py
+```
+
+启动后端服务：
+
+```bash
+bash scripts/start_dev.sh
+```
+
+或直接运行：
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8008 --reload
+```
+
+启动后访问 `http://localhost:8008/`。如需使用其他端口，可以设置 `APP_PORT`：
+
+```bash
+APP_PORT=8000 bash scripts/start_dev.sh
+```
+
+## 论文图片处理
+
+PDF 入库时会额外提取论文中的图片，并把图片作为可引用的视觉证据返回给前端。
+
+图片本体保存到本地上传目录：
+
+```text
+data/uploads/{document_id}/figures/
+```
+
+元数据和切分后的 chunk 保存到 SQLite：
+
+```text
+data/rag.db
+```
+
+Qdrant 中只保存向量和 payload，不保存图片文件本体。对于论文图片，会生成 `figure` 类型的 chunk，并对图片页码、图片序号、caption 和同页正文上下文做 embedding。payload 会包含：
+
+```json
+{
+  "document_id": "doc_xxx",
+  "chunk_id": "chunk_xxx",
+  "source_name": "paper.pdf",
+  "page_number": 5,
+  "content_type": "figure"
+}
+```
+
+查询命中图片相关 chunk 时，接口返回的 citation 会包含 `image_url` 和 `caption`。前端会在“引用来源”中展示图片预览，点击图片可以打开大图。
+
+整体存储关系：
+
+```text
+PDF 原文件
+  -> data/uploads/
+
+提取出的论文图片
+  -> data/uploads/{document_id}/figures/
+
+文本 chunk、figure chunk 元数据
+  -> data/rag.db
+
+文本 chunk、figure chunk 向量
+  -> Qdrant collection: rag_chunks
+```
+
 ## 预期目录结构
 
 ```text

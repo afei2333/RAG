@@ -843,6 +843,35 @@ a:hover { text-decoration: underline; }
   overflow-wrap: anywhere;
 }
 
+.citation-figure {
+  display: grid;
+  gap: 7px;
+  margin: 8px 0 9px;
+}
+
+.citation-figure a {
+  display: block;
+  width: min(100%, 560px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fffdf8;
+  overflow: hidden;
+}
+
+.citation-figure img {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  background: #fffdf8;
+}
+
+.citation-figure figcaption {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
 /* ── Composer ── */
 .composer-wrapper {
   padding: 0 clamp(16px, 4vw, 60px) 24px;

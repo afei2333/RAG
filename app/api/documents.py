@@ -17,7 +17,11 @@ from app.db.schemas import (
     DocumentUploadResponse,
     JobDetail,
 )
-from app.ingest.pipeline import ingest_upload, remove_file_quietly
+from app.ingest.pipeline import (
+    ingest_upload,
+    remove_document_assets,
+    remove_file_quietly,
+)
 from app.rag.vector_store import get_vector_store
 
 
@@ -76,6 +80,7 @@ async def remove_document(document_id: str) -> DeleteResponse:
     await get_vector_store().delete_document(document_id)
     deleted = delete_document(document_id)
     remove_file_quietly(row["file_path"])
+    remove_document_assets(document_id)
     return DeleteResponse(deleted=deleted)
 
 
@@ -85,4 +90,3 @@ def job_detail(job_id: str) -> JobDetail:
     if row is None:
         raise HTTPException(status_code=404, detail="Job not found")
     return JobDetail(**row)
-

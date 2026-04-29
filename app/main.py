@@ -10,6 +10,7 @@ from app.db.database import init_db
 
 def create_app() -> FastAPI:
     configure_logging()
+    settings.storage_dir.mkdir(parents=True, exist_ok=True)
 
     app = FastAPI(
         title=settings.app_name,
@@ -21,6 +22,7 @@ def create_app() -> FastAPI:
     app.include_router(documents.router, prefix="/api/v1")
     app.include_router(query.router, prefix="/api/v1")
     app.mount("/static", StaticFiles(directory="app/static"), name="static")
+    app.mount("/uploads", StaticFiles(directory=settings.storage_dir), name="uploads")
 
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:

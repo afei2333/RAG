@@ -16,6 +16,7 @@ from app.db.database import (
     update_document_status,
     update_job,
 )
+from app.ingest.figures import extract_pdf_figures
 from app.ingest.loaders import load_document
 from app.ingest.splitter import split_pages
 from app.rag.embeddings import get_embedding_provider
@@ -76,6 +77,15 @@ async def ingest_upload(file: UploadFile, raw_metadata: str | None = None) -> di
             source_name=file.filename or file_path.name,
             document_id=document_id,
         )
+        chunks.extend(
+            extract_pdf_figures(
+                file_path,
+                pages=pages,
+                source_name=file.filename or file_path.name,
+                document_id=document_id,
+                start_index=len(chunks),
+            )
+        )
         if not chunks:
             raise ValueError("No text content found in document")
 
@@ -111,7 +121,12 @@ def remove_file_quietly(file_path: str) -> None:
         path.unlink()
 
 
+def remove_document_assets(document_id: str) -> None:
+    path = settings.storage_dir / document_id
+    if path.exists():
+        shutil.rmtree(path)
+
+
 def reset_storage() -> None:
     if settings.storage_dir.exists():
         shutil.rmtree(settings.storage_dir)
-

@@ -110,6 +110,12 @@ def _row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
     return dict(row)
 
 
+def _chunk_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    chunk = dict(row)
+    chunk["metadata"] = json.loads(chunk.get("metadata_json") or "{}")
+    return chunk
+
+
 def _ensure_column(
     conn: sqlite3.Connection, table_name: str, column_name: str, definition: str
 ) -> None:
@@ -291,7 +297,7 @@ def get_chunks_by_ids(chunk_ids: list[str]) -> list[dict[str, Any]]:
         rows = conn.execute(
             f"SELECT * FROM chunks WHERE id IN ({placeholders})", chunk_ids
         ).fetchall()
-    by_id = {row["id"]: dict(row) for row in rows}
+    by_id = {row["id"]: _chunk_row_to_dict(row) for row in rows}
     return [by_id[chunk_id] for chunk_id in chunk_ids if chunk_id in by_id]
 
 
@@ -326,7 +332,7 @@ def get_neighbor_chunks(chunk_refs: list[tuple[str, int]], window: int) -> list[
             """,
             params,
         ).fetchall()
-    return [dict(row) for row in rows]
+    return [_chunk_row_to_dict(row) for row in rows]
 
 
 def save_query_log(

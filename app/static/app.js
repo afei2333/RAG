@@ -432,9 +432,14 @@ function renderEmptyState() {
 
 function renderCitations(citations) {
   if (!citations.length) return "";
+  const figureCount = citations.filter((c) => c.image_url).length;
+  const summaryText = figureCount
+    ? `引用来源 ${citations.length} 条 · 相关图片 ${figureCount} 张`
+    : `引用来源 ${citations.length} 条`;
   const items = citations.map((c, i) => {
     const page = c.page_number ? ` · 第 ${c.page_number} 页` : "";
     const score = renderCitationScore(c);
+    const media = renderCitationMedia(c);
     return `
       <article class="citation">
         <div class="citation-header">
@@ -442,6 +447,7 @@ function renderCitations(citations) {
           <span class="citation-title">${escapeHtml(c.source_name)}${escapeHtml(page)}</span>
           <span class="citation-score">${escapeHtml(score)}</span>
         </div>
+        ${media}
         <div class="citation-text">${escapeHtml(c.text)}</div>
       </article>`;
   }).join("");
@@ -449,10 +455,22 @@ function renderCitations(citations) {
   return `
     <section class="citations">
       <details>
-        <summary>引用来源 &nbsp;${citations.length} 条</summary>
+        <summary>${escapeHtml(summaryText)}</summary>
         <div class="citations-body">${items}</div>
       </details>
     </section>`;
+}
+
+function renderCitationMedia(citation) {
+  if (!citation.image_url) return "";
+  const caption = citation.caption || citation.text || "论文图片";
+  return `
+    <figure class="citation-figure">
+      <a href="${escapeHtml(citation.image_url)}" target="_blank" rel="noreferrer">
+        <img src="${escapeHtml(citation.image_url)}" alt="${escapeHtml(caption)}" loading="lazy">
+      </a>
+      ${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ""}
+    </figure>`;
 }
 
 function renderCitationScore(citation) {

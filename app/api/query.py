@@ -62,18 +62,7 @@ async def query_knowledge_base(request: QueryRequest) -> QueryResponse:
             conversation_history=conversation_history,
         )
         answer = await get_llm_provider().generate(messages)
-        citations = [
-            {
-                "document_id": chunk["document_id"],
-                "chunk_id": chunk["id"],
-                "source_name": chunk["source_name"],
-                "page_number": chunk["page_number"],
-                "score": chunk["score"],
-                "retrieval_role": chunk.get("retrieval_role", "hit"),
-                "text": chunk["content"][:500],
-            }
-            for chunk in limited_contexts
-        ]
+        citations = [_citation_from_chunk(chunk) for chunk in limited_contexts]
 
     query_id = f"query_{uuid4().hex}"
     document_ids = sorted(
@@ -100,6 +89,23 @@ async def query_knowledge_base(request: QueryRequest) -> QueryResponse:
         answer=answer,
         citations=[Citation(**citation) for citation in citations],
     )
+
+
+def _citation_from_chunk(chunk: dict) -> dict:
+    metadata = chunk.get("metadata", {})
+    content_type = metadata.get("content_type", "body")
+    return {
+        "document_id": chunk["document_id"],
+        "chunk_id": chunk["id"],
+        "source_name": chunk["source_name"],
+        "page_number": chunk["page_number"],
+        "score": chunk["score"],
+        "retrieval_role": chunk.get("retrieval_role", "hit"),
+        "content_type": content_type,
+        "image_url": metadata.get("image_url") if content_type == "figure" else None,
+        "caption": metadata.get("caption") if content_type == "figure" else None,
+        "text": chunk["content"][:500],
+    }
 
 
 @router.get("/queries", response_model=QueryLogListResponse)

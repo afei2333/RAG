@@ -59,6 +59,9 @@ class Citation(BaseModel):
     page_number: int | None = None
     score: float
     retrieval_role: str | None = None
+    content_type: str | None = None
+    image_url: str | None = None
+    caption: str | None = None
     text: str
 
 
