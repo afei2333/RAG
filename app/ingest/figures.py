@@ -11,7 +11,8 @@ from app.ingest.splitter import clean_text
 FIGURE_CAPTION_RE = re.compile(
     r"(?im)^\s*(fig(?:ure)?\.?\s*\d+[a-z]?[.:)\-]?\s+.+)$"
 )
-MAX_CONTEXT_CHARS = 1200
+FIGURE_NUMBER_RE = re.compile(r"\bfig(?:ure)?\.?\s*(\d+[a-z]?)\b", re.IGNORECASE)
+MAX_REFERENCE_SENTENCES = 4
 
 
 def extract_pdf_figures(
@@ -44,12 +45,28 @@ def extract_pdf_figures(
         if not page_text and page_info:
             page_text = clean_text(page_info.get("text", ""))
         captions = _extract_captions(page_text)
-        context = _compact_context(page_text)
 
         for image_index, image in enumerate(images, start=1):
             image_data = getattr(image, "data", None)
             if not image_data:
                 continue
+
+            caption = _caption_for_image(captions, image_index)
+            if not caption:
+                continue
+
+            figure_number = _figure_number(caption)
+            reference_sentences = _figure_reference_sentences(
+                page_text,
+                figure_number=figure_number,
+                caption=caption,
+            )
+            content = _figure_content(
+                page_number=page_index,
+                figure_index=image_index,
+                caption=caption,
+                reference_sentences=reference_sentences,
+            )
 
             figures_dir.mkdir(parents=True, exist_ok=True)
             image_ext = _image_extension(getattr(image, "name", ""))
@@ -57,13 +74,6 @@ def extract_pdf_figures(
             image_path = figures_dir / image_name
             image_path.write_bytes(image_data)
 
-            caption = _caption_for_image(captions, image_index)
-            content = _figure_content(
-                page_number=page_index,
-                figure_index=image_index,
-                caption=caption,
-                context=context,
-            )
             figure_chunks.append(
                 {
                     "id": str(uuid4()),
@@ -75,7 +85,9 @@ def extract_pdf_figures(
                     "metadata": {
                         "content_type": "figure",
                         "figure_index": image_index,
+                        "figure_number": figure_number,
                         "caption": caption,
+                        "reference_sentences": reference_sentences,
                         "image_path": str(image_path),
                         "image_url": f"/uploads/{document_id}/figures/{image_name}",
                     },
@@ -109,10 +121,51 @@ def _caption_for_image(captions: list[str], image_index: int) -> str:
     return captions[min(image_index - 1, len(captions) - 1)]
 
 
-def _compact_context(text: str) -> str:
-    if len(text) <= MAX_CONTEXT_CHARS:
-        return text
-    return text[:MAX_CONTEXT_CHARS].rsplit(" ", 1)[0].strip()
+def _figure_number(caption: str) -> str:
+    match = FIGURE_NUMBER_RE.search(caption)
+    return match.group(1).lower() if match else ""
+
+
+def _figure_reference_sentences(
+    text: str,
+    *,
+    figure_number: str,
+    caption: str,
+) -> list[str]:
+    if not figure_number:
+        return []
+
+    caption_normalized = _normalize_sentence(caption)
+    references = []
+    for sentence in _split_sentences(text):
+        normalized = _normalize_sentence(sentence)
+        if not normalized or normalized == caption_normalized:
+            continue
+        if _mentions_figure_number(sentence, figure_number):
+            references.append(sentence)
+        if len(references) >= MAX_REFERENCE_SENTENCES:
+            break
+    return references
+
+
+def _split_sentences(text: str) -> list[str]:
+    normalized = re.sub(r"\s+", " ", text).strip()
+    if not normalized:
+        return []
+    parts = re.split(r"(?<=[.!?。！？])\s+|(?<=；)\s*", normalized)
+    return [part.strip() for part in parts if part.strip()]
+
+
+def _normalize_sentence(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip().lower()
+
+
+def _mentions_figure_number(sentence: str, figure_number: str) -> bool:
+    pattern = re.compile(
+        rf"\bfig(?:ure)?\.?\s*{re.escape(figure_number)}\b",
+        re.IGNORECASE,
+    )
+    return bool(pattern.search(sentence))
 
 
 def _figure_content(
@@ -120,13 +173,13 @@ def _figure_content(
     page_number: int,
     figure_index: int,
     caption: str,
-    context: str,
+    reference_sentences: list[str],
 ) -> str:
     parts = [f"Figure image on page {page_number}, image {figure_index}."]
-    if caption:
-        parts.append(f"Caption: {caption}")
-    if context:
-        parts.append(f"Page context: {context}")
+    parts.append(f"Caption: {caption}")
+    if reference_sentences:
+        parts.append("References:")
+        parts.extend(f"- {sentence}" for sentence in reference_sentences)
     return "\n".join(parts)
 
 

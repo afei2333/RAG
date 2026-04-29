@@ -90,7 +90,7 @@ data/uploads/{document_id}/figures/
 data/rag.db
 ```
 
-Qdrant 中只保存向量和 payload，不保存图片文件本体。对于论文图片，会生成 `figure` 类型的 chunk，并对图片页码、图片序号、caption 和同页正文上下文做 embedding。payload 会包含：
+Qdrant 中只保存向量和 payload，不保存图片文件本体。对于论文图片，只索引能匹配到 caption 的图片，并生成 `figure` 类型的 chunk。embedding 内容由图片页码、图片序号、caption，以及正文中引用该 figure 的句子组成，不使用整页正文作为图片上下文。payload 会包含：
 
 ```json
 {

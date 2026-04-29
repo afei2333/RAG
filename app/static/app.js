@@ -544,8 +544,13 @@ function renderMarkdown(value) {
       blocks.push(renderMarkdownImage(image[2], image[1]));
       continue;
     }
-    const heading = line.match(/^(#{1,3})\s+(.+)$/);
-    if (heading) { flush(); blocks.push(`<h${heading[1].length + 2}>${renderInlineMarkdown(heading[2])}</h${heading[1].length + 2}>`); continue; }
+    const heading = line.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) {
+      flush();
+      const level = heading[1].length;
+      blocks.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
+      continue;
+    }
     const bullet = line.match(/^\s*[-*]\s+(.+)$/);
     if (bullet) { if (paragraph.length) { blocks.push(`<p>${renderInlineMarkdown(paragraph.join(" "))}</p>`); paragraph = []; } list.push(bullet[1]); continue; }
     if (!line.trim()) { flush(); continue; }
