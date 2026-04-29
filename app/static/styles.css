@@ -353,17 +353,30 @@ a:hover { text-decoration: underline; }
 
 .project-doc-option {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 8px;
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
+  transition: opacity 0.2s ease, transform 0.2s var(--ease-out);
+}
+
+.project-doc-option.is-removing {
+  opacity: 0;
+  transform: translateX(-8px) scale(0.97);
+}
+
+.project-doc-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
   cursor: pointer;
 }
 
-.project-doc-option input { margin-top: 3px; }
+.project-doc-choice input { margin-top: 3px; }
 
 .project-create-button {
   width: 100%;
@@ -477,23 +490,6 @@ a:hover { text-decoration: underline; }
 }
 
 .ghost-button:hover { background: rgba(192,58,43,.1); color: #c03a2b; }
-
-.project-delete-button {
-  flex-shrink: 0;
-  height: 28px;
-  padding: 0 9px;
-  border-radius: 6px;
-  color: #a33a2b;
-  background: rgba(192,58,43,.08);
-  font-size: 12px;
-  font-weight: 600;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.project-delete-button:hover:not(:disabled) {
-  background: rgba(192,58,43,.15);
-  color: #7f281f;
-}
 
 /* ── History ── */
 .history-badge {

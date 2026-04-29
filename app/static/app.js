@@ -165,13 +165,16 @@ function renderProjectBuilder(docs) {
     ? selectableDocs.map((doc) => {
         const checked = selectedProjectDocumentIds.has(doc.id) ? " checked" : "";
         return `
-          <label class="project-doc-option">
-            <input type="checkbox" data-project-doc="${escapeHtml(doc.id)}"${checked}>
-            <span>
-              <span class="document-title">${escapeHtml(doc.filename)}</span>
-              <span class="document-meta">${escapeHtml(docStatusText(doc))}</span>
-            </span>
-          </label>`;
+          <div class="project-doc-option">
+            <label class="project-doc-choice">
+              <input type="checkbox" data-project-doc="${escapeHtml(doc.id)}"${checked}>
+              <span>
+                <span class="document-title">${escapeHtml(doc.filename)}</span>
+                <span class="document-meta">${escapeHtml(docStatusText(doc))}</span>
+              </span>
+            </label>
+            <button class="ghost-button" type="button" data-delete-document="${escapeHtml(doc.id)}" title="删除文档">×</button>
+          </div>`;
       }).join("")
     : '<div class="muted-box">暂无已索引完成的文档</div>';
 
@@ -196,7 +199,7 @@ function renderProjectItem(project, index) {
           <span class="document-meta">${escapeHtml(project.document_count)} 个文档 · ${escapeHtml(meta)}</span>
         </button>
       </div>
-      <button class="project-delete-button" type="button" data-delete-project="${escapeHtml(project.id)}" title="删除项目">删除</button>
+      <button class="ghost-button" type="button" data-delete-project="${escapeHtml(project.id)}" title="删除项目">×</button>
     </article>`;
 }
 
@@ -289,12 +292,13 @@ documentList.addEventListener("click", async (event) => {
   if (!deleteBtn) return;
 
   const id = deleteBtn.dataset.deleteDocument;
-  const article = deleteBtn.closest(".document-item");
+  const article = deleteBtn.closest(".document-item, .project-doc-option");
   deleteBtn.disabled = true;
   setUploadStatus("正在删除…");
 
   try {
     await apiFetch(`/api/v1/documents/${encodeURIComponent(id)}`, { method: "DELETE" });
+    selectedProjectDocumentIds.delete(id);
     if (article) {
       article.classList.add("is-removing");
       await sleep(200);
@@ -576,7 +580,7 @@ function renderEmptyState() {
   conversation.innerHTML = `
     <div class="empty-state">
       <h3>${hasProject ? "今天想查点什么？" : "先进入一个项目"}</h3>
-      <p>${hasProject ? "在当前项目范围内提问，回答会带上引用来源，方便核对依据。" : "从左侧上传并索引文件，创建项目后进入项目，才能开始对话。"}</p>
+      <p>${hasProject ? "在当前项目范围内提问，回答会带上引用来源，方便核对依据。" : "从左侧上传并索引文件，创建项目后进入，开始对话。"}</p>
       <div class="hint-chips">
         <span class="chip">📄 支持 PDF、Word、Markdown</span>
         <span class="chip">🔗 引用溯源</span>
