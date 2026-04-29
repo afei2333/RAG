@@ -36,9 +36,9 @@
         </header>
 
         <!-- Documents -->
-        <section class="side-section">
+        <section class="side-section" id="projectSection">
           <div class="section-header">
-            <h2 class="section-label">文档库</h2>
+            <h2 class="section-label">项目</h2>
           </div>
 
           <form id="uploadForm" class="upload-area">
@@ -60,9 +60,10 @@
         </section>
 
         <!-- History -->
-        <section class="side-section history-section">
+        <section class="side-section history-section is-hidden" id="historySection">
           <div class="section-header">
-            <h2 class="section-label">对话历史</h2>
+            <button id="backToProjects" class="back-button" type="button">← 项目</button>
+            <h2 class="section-label" id="historyTitle">对话历史</h2>
             <span id="historyCount" class="history-badge"></span>
           </div>
           <div id="historyList" class="history-list"></div>

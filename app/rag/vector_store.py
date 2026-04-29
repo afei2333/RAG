@@ -78,6 +78,7 @@ class QdrantVectorStore:
         top_k: int,
         score_threshold: float,
         document_id: str | None = None,
+        document_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         payload: dict[str, Any] = {
             "vector": vector,
@@ -85,7 +86,16 @@ class QdrantVectorStore:
             "score_threshold": score_threshold,
             "with_payload": True,
         }
-        if document_id:
+        if document_ids is not None:
+            payload["filter"] = {
+                "must": [
+                    {
+                        "key": "document_id",
+                        "match": {"any": document_ids},
+                    }
+                ]
+            }
+        elif document_id:
             payload["filter"] = {
                 "must": [
                     {

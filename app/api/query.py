@@ -7,7 +7,9 @@ from fastapi import APIRouter, HTTPException, Query
 from app.core.config import settings
 from app.db.database import (
     delete_query_log,
+    get_project,
     list_query_logs,
+    list_query_logs_by_project,
     list_query_logs_by_conversation,
     save_query_log,
 )
@@ -37,6 +39,7 @@ async def query_knowledge_base(request: QueryRequest) -> QueryResponse:
 
     conversation_id = request.conversation_id or f"conv_{uuid4().hex}"
     conversation_history = list_query_logs_by_conversation(conversation_id, limit=6)
+    document_ids = _document_ids_for_request(request)
     retrieval_question = "\n".join(
         [
             *(item["question"] for item in conversation_history[-3:]),
@@ -48,7 +51,8 @@ async def query_knowledge_base(request: QueryRequest) -> QueryResponse:
         question=retrieval_question,
         top_k=top_k,
         score_threshold=score_threshold,
-        document_id=request.document_id,
+        document_id=request.document_id if not document_ids else None,
+        document_ids=document_ids,
     )
     limited_contexts = contexts[: settings.max_context_chunks]
 
@@ -66,23 +70,25 @@ async def query_knowledge_base(request: QueryRequest) -> QueryResponse:
         answer = _append_inline_figures(answer, citations)
 
     query_id = f"query_{uuid4().hex}"
-    document_ids = sorted(
+    cited_document_ids = sorted(
         {
             citation["document_id"]
             for citation in citations
             if citation.get("document_id")
         }
     )
-    if request.document_id and request.document_id not in document_ids:
-        document_ids.append(request.document_id)
+    for document_id in [request.document_id, *(document_ids or [])]:
+        if document_id and document_id not in cited_document_ids:
+            cited_document_ids.append(document_id)
 
     save_query_log(
         query_id=query_id,
         conversation_id=conversation_id,
+        project_id=request.project_id,
         question=request.question,
         answer=answer,
         citations=citations,
-        document_ids=document_ids,
+        document_ids=cited_document_ids,
     )
     return QueryResponse(
         query_id=query_id,
@@ -90,6 +96,17 @@ async def query_knowledge_base(request: QueryRequest) -> QueryResponse:
         answer=answer,
         citations=[Citation(**citation) for citation in citations],
     )
+
+
+def _document_ids_for_request(request: QueryRequest) -> list[str] | None:
+    if request.project_id:
+        project = get_project(request.project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+        return project["document_ids"]
+    if request.document_ids:
+        return request.document_ids
+    return None
 
 
 def _citation_from_chunk(chunk: dict) -> dict:
@@ -148,7 +165,11 @@ def _escape_markdown_alt(value: str) -> str:
 def query_history(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    project_id: str | None = None,
 ) -> QueryLogListResponse:
+    if project_id:
+        items = list_query_logs_by_project(project_id, limit=page_size)
+        return QueryLogListResponse(items=items, total=len(items))
     result = list_query_logs(page=page, page_size=page_size)
     return QueryLogListResponse(**result)
 

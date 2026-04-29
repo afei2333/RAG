@@ -80,15 +80,25 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS query_logs (
                 id TEXT PRIMARY KEY,
                 conversation_id TEXT,
+                project_id TEXT,
                 question TEXT NOT NULL,
                 answer TEXT NOT NULL,
                 citations_json TEXT NOT NULL DEFAULT '[]',
                 document_ids_json TEXT NOT NULL DEFAULT '[]',
                 created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                document_ids_json TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """
         )
         _ensure_column(conn, "query_logs", "conversation_id", "TEXT")
+        _ensure_column(conn, "query_logs", "project_id", "TEXT")
         _ensure_column(
             conn,
             "query_logs",
@@ -225,7 +235,95 @@ def delete_document(document_id: str) -> bool:
         conn.execute("DELETE FROM chunks WHERE document_id = ?", (document_id,))
         conn.execute("DELETE FROM ingestion_jobs WHERE document_id = ?", (document_id,))
         conn.execute("DELETE FROM documents WHERE id = ?", (document_id,))
+        rows = conn.execute("SELECT * FROM projects").fetchall()
+        for row in rows:
+            document_ids = json.loads(row["document_ids_json"] or "[]")
+            if document_id not in document_ids:
+                continue
+            next_document_ids = [
+                item for item in document_ids if item != document_id
+            ]
+            conn.execute(
+                """
+                UPDATE projects
+                SET document_ids_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    json.dumps(next_document_ids, ensure_ascii=False),
+                    utc_now(),
+                    row["id"],
+                ),
+            )
     return True
+
+
+def create_project(*, project_id: str, name: str, document_ids: list[str]) -> None:
+    now = utc_now()
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO projects (
+                id, name, document_ids_json, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                project_id,
+                name,
+                json.dumps(_unique_ids(document_ids), ensure_ascii=False),
+                now,
+                now,
+            ),
+        )
+
+
+def list_projects() -> dict[str, Any]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM projects
+            ORDER BY updated_at DESC, created_at DESC
+            """
+        ).fetchall()
+    items = [_project_row_to_dict(row) for row in rows]
+    return {"items": items, "total": len(items)}
+
+
+def get_project(project_id: str) -> dict[str, Any] | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM projects WHERE id = ?",
+            (project_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return _project_row_to_dict(row)
+
+
+def delete_project(project_id: str) -> bool:
+    with get_conn() as conn:
+        cursor = conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+    return cursor.rowcount > 0
+
+
+def _project_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    item = dict(row)
+    item["document_ids"] = json.loads(item.pop("document_ids_json") or "[]")
+    item["document_count"] = len(item["document_ids"])
+    return item
+
+
+def _unique_ids(values: list[str]) -> list[str]:
+    seen = set()
+    result = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
 
 
 def create_job(job_id: str, document_id: str, status: str = "created") -> None:
@@ -339,6 +437,7 @@ def save_query_log(
     *,
     query_id: str,
     conversation_id: str,
+    project_id: str | None,
     question: str,
     answer: str,
     citations: list[dict[str, Any]],
@@ -348,14 +447,15 @@ def save_query_log(
         conn.execute(
             """
             INSERT INTO query_logs (
-                id, conversation_id, question, answer, citations_json,
+                id, conversation_id, project_id, question, answer, citations_json,
                 document_ids_json, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 query_id,
                 conversation_id,
+                project_id,
                 question,
                 answer,
                 json.dumps(citations, ensure_ascii=False),
@@ -395,6 +495,36 @@ def list_query_logs(page: int, page_size: int) -> dict[str, Any]:
         item["document_ids"] = json.loads(item.pop("document_ids_json") or "[]")
         items.append(item)
     return {"items": items, "total": total}
+
+
+def list_query_logs_by_project(project_id: str, limit: int = 30) -> list[dict[str, Any]]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT q.*
+            FROM query_logs q
+            JOIN (
+                SELECT conversation_id, MAX(created_at) AS latest_at
+                FROM query_logs
+                WHERE project_id = ?
+                GROUP BY conversation_id
+            ) latest
+              ON latest.conversation_id = q.conversation_id
+             AND latest.latest_at = q.created_at
+            WHERE q.project_id = ?
+            ORDER BY q.created_at DESC
+            LIMIT ?
+            """,
+            (project_id, project_id, limit),
+        ).fetchall()
+
+    items = []
+    for row in rows:
+        item = dict(row)
+        item["citations"] = json.loads(item.pop("citations_json") or "[]")
+        item["document_ids"] = json.loads(item.pop("document_ids_json") or "[]")
+        items.append(item)
+    return items
 
 
 def list_query_logs_by_conversation(

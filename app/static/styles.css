@@ -192,12 +192,30 @@ a:hover { text-decoration: underline; }
 }
 
 .side-section { min-width: 0; }
+.side-section.is-hidden { display: none; }
 
 .history-section {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.back-button:hover {
+  background: rgba(40,35,30,.07);
+  color: var(--text);
 }
 
 /* ── Upload area ── */
@@ -294,6 +312,61 @@ a:hover { text-decoration: underline; }
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.project-builder {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(250,246,239,0.72);
+}
+
+.project-name-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+
+.project-name-input:focus { border-color: #c1844a; }
+
+.project-docs {
+  display: grid;
+  gap: 5px;
+  max-height: 210px;
+  overflow-y: auto;
+}
+
+.project-doc-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.project-doc-option input { margin-top: 3px; }
+
+.project-create-button {
+  width: 100%;
+  justify-content: center;
 }
 
 .muted-box {

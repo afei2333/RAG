@@ -13,14 +13,21 @@ const statusDot         = document.querySelector(".status-dot");
 const conversation      = document.querySelector("#conversation");
 const historyList       = document.querySelector("#historyList");
 const historyCount      = document.querySelector("#historyCount");
+const historyTitle      = document.querySelector("#historyTitle");
 const newConversation   = document.querySelector("#newConversation");
 const dropZone          = document.querySelector("#dropZone");
+const projectSection    = document.querySelector("#projectSection");
+const historySection    = document.querySelector("#historySection");
+const backToProjects    = document.querySelector("#backToProjects");
 
 /* ─── State ─── */
 let currentConversationId = null;
 let currentMessages = [];
-let selectedDocumentId = "";
 let documentsById = new Map();
+let projectsById = new Map();
+let currentProjectId = "";
+let projectBuilderOpen = false;
+let selectedProjectDocumentIds = new Set();
 
 /* ═══════════════════════════════════════════
    API helpers
@@ -94,47 +101,15 @@ dropZone.addEventListener("drop", (e) => {
 });
 
 /* ═══════════════════════════════════════════
-   Documents
+   Projects and documents
    ═══════════════════════════════════════════ */
-function renderDocuments(data) {
-  documentsById = new Map(data.items.map((d) => [d.id, d]));
-
-  if (!data.items.length) {
-    documentList.innerHTML = '<div class="muted-box">还没有文档，先上传一个吧</div>';
-    return;
-  }
-
-  const allBtn = `
-    <button class="document-filter${selectedDocumentId ? "" : " is-selected"}" type="button" data-select-document="">
-      <span class="document-title">全部文档</span>
-      <span class="document-meta">跨知识库检索</span>
-    </button>`;
-
-  const items = data.items.map((doc, i) => {
-    const statusClass = doc.status === "failed" ? " status-failed" : "";
-    const selectedClass = selectedDocumentId === doc.id ? " is-selected" : "";
-    return `
-      <article class="document-item${selectedClass}" style="animation-delay:${i * 40}ms">
-        <div class="item-main">
-          <button class="document-open" type="button" data-select-document="${escapeHtml(doc.id)}">
-            <span class="document-title">${escapeHtml(doc.filename)}</span>
-            <span class="document-meta${statusClass}">${escapeHtml(docStatusText(doc))}</span>
-          </button>
-        </div>
-        <button class="ghost-button" type="button" data-delete-document="${escapeHtml(doc.id)}" title="删除文档">×</button>
-      </article>`;
-  }).join("");
-
-  documentList.innerHTML = allBtn + items;
-  updateActiveDocumentStatus();
-}
-
 async function loadDocuments() {
   refreshDocuments.classList.add("is-spinning");
   refreshDocuments.disabled = true;
   try {
     const data = await apiFetch("/api/v1/documents?page=1&page_size=50");
-    renderDocuments(data);
+    documentsById = new Map(data.items.map((d) => [d.id, d]));
+    renderProjectView();
   } catch (error) {
     documentList.innerHTML = `<div class="muted-box" style="color:#c03a2b">${escapeHtml(error.message)}</div>`;
   } finally {
@@ -142,6 +117,82 @@ async function loadDocuments() {
     // Keep spin class briefly so the animation plays fully
     setTimeout(() => refreshDocuments.classList.remove("is-spinning"), 700);
   }
+}
+
+async function loadProjects() {
+  const data = await apiFetch("/api/v1/projects");
+  projectsById = new Map(data.items.map((item) => [item.id, item]));
+  renderProjectView();
+}
+
+function renderProjectView() {
+  projectSection.classList.remove("is-hidden");
+  historySection.classList.add("is-hidden");
+
+  const docs = [...documentsById.values()];
+  const projects = [...projectsById.values()];
+  const builder = projectBuilderOpen ? renderProjectBuilder(docs) : "";
+  const projectItems = projects.length
+    ? projects.map(renderProjectItem).join("")
+    : '<div class="muted-box">还没有项目，多选文档创建一个知识库范围</div>';
+
+  documentList.innerHTML = `
+    <button class="document-filter" type="button" data-toggle-project-builder>
+      <span class="document-title">${projectBuilderOpen ? "收起新建项目" : "新建项目"}</span>
+      <span class="document-meta">多选已索引文档作为知识库范围</span>
+    </button>
+    ${builder}
+    <div class="project-list">${projectItems}</div>`;
+  updateActiveDocumentStatus();
+}
+
+function renderProjectBuilder(docs) {
+  const selectableDocs = docs.filter((doc) => doc.status === "completed");
+  const docItems = selectableDocs.length
+    ? selectableDocs.map((doc) => {
+        const checked = selectedProjectDocumentIds.has(doc.id) ? " checked" : "";
+        return `
+          <label class="project-doc-option">
+            <input type="checkbox" data-project-doc="${escapeHtml(doc.id)}"${checked}>
+            <span>
+              <span class="document-title">${escapeHtml(doc.filename)}</span>
+              <span class="document-meta">${escapeHtml(docStatusText(doc))}</span>
+            </span>
+          </label>`;
+      }).join("")
+    : '<div class="muted-box">暂无已索引完成的文档</div>';
+
+  return `
+    <section class="project-builder">
+      <input id="projectNameInput" class="project-name-input" type="text" placeholder="项目名称">
+      <div class="project-docs">${docItems}</div>
+      <button class="index-button project-create-button" type="button" data-create-project>创建项目</button>
+    </section>`;
+}
+
+function renderProjectItem(project, index) {
+  const names = project.document_ids
+    .map((id) => documentsById.get(id)?.filename)
+    .filter(Boolean);
+  const meta = names.length ? names.join("、") : "暂无文档";
+  return `
+    <article class="document-item" style="animation-delay:${index * 40}ms">
+      <div class="item-main">
+        <button class="document-open" type="button" data-open-project="${escapeHtml(project.id)}">
+          <span class="document-title">${escapeHtml(project.name)}</span>
+          <span class="document-meta">${escapeHtml(project.document_count)} 个文档 · ${escapeHtml(meta)}</span>
+        </button>
+      </div>
+      <button class="ghost-button" type="button" data-delete-project="${escapeHtml(project.id)}" title="删除项目">×</button>
+    </article>`;
+}
+
+function renderHistoryView() {
+  const project = projectsById.get(currentProjectId);
+  projectSection.classList.add("is-hidden");
+  historySection.classList.remove("is-hidden");
+  historyTitle.textContent = project?.name || "对话历史";
+  updateActiveDocumentStatus();
 }
 
 /* ─── Upload ─── */
@@ -170,6 +221,7 @@ uploadForm.addEventListener("submit", async (event) => {
     dropZone._droppedFile = null;
     updateSelectedFileLabel(null);
     await loadDocuments();
+    await loadProjects();
   } catch (error) {
     setUploadStatus(error.message, "error");
   } finally {
@@ -189,13 +241,33 @@ function updateSelectedFileLabel(file) {
 
 /* ─── Document selection & deletion ─── */
 documentList.addEventListener("click", async (event) => {
-  const selectBtn = event.target.closest("[data-select-document]");
-  if (selectBtn) {
-    selectedDocumentId = selectBtn.dataset.selectDocument || "";
+  const builderBtn = event.target.closest("[data-toggle-project-builder]");
+  if (builderBtn) {
+    projectBuilderOpen = !projectBuilderOpen;
+    renderProjectView();
+    return;
+  }
+
+  const openProjectBtn = event.target.closest("[data-open-project]");
+  if (openProjectBtn) {
+    currentProjectId = openProjectBtn.dataset.openProject || "";
     currentConversationId = null;
     currentMessages = [];
-    renderDocuments({ items: [...documentsById.values()] });
+    renderHistoryView();
     renderEmptyState();
+    await loadHistory();
+    return;
+  }
+
+  const createProjectBtn = event.target.closest("[data-create-project]");
+  if (createProjectBtn) {
+    await createProjectFromSelection(createProjectBtn);
+    return;
+  }
+
+  const deleteProjectBtn = event.target.closest("[data-delete-project]");
+  if (deleteProjectBtn) {
+    await deleteProject(deleteProjectBtn.dataset.deleteProject, deleteProjectBtn);
     return;
   }
 
@@ -213,26 +285,82 @@ documentList.addEventListener("click", async (event) => {
       article.classList.add("is-removing");
       await sleep(200);
     }
-    if (selectedDocumentId === id) {
-      selectedDocumentId = "";
-      currentConversationId = null;
-      currentMessages = [];
-      renderEmptyState();
-    }
     setUploadStatus("文档已删除", "success");
     await loadDocuments();
+    await loadProjects();
   } catch (error) {
     setUploadStatus(error.message, "error");
     deleteBtn.disabled = false;
   }
 });
 
+documentList.addEventListener("change", (event) => {
+  const checkbox = event.target.closest("[data-project-doc]");
+  if (!checkbox) return;
+  const id = checkbox.dataset.projectDoc;
+  if (checkbox.checked) selectedProjectDocumentIds.add(id);
+  else selectedProjectDocumentIds.delete(id);
+});
+
+async function createProjectFromSelection(button) {
+  const input = document.querySelector("#projectNameInput");
+  const documentIds = [...selectedProjectDocumentIds];
+  if (!documentIds.length) {
+    setUploadStatus("请至少选择一个已索引文档", "error");
+    return;
+  }
+  const fallbackName = documentIds
+    .map((id) => documentsById.get(id)?.filename)
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("、");
+  const name = input.value.trim() || fallbackName || "未命名项目";
+
+  button.disabled = true;
+  try {
+    await apiFetch("/api/v1/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, document_ids: documentIds }),
+    });
+    selectedProjectDocumentIds = new Set();
+    projectBuilderOpen = false;
+    setUploadStatus("项目已创建", "success");
+    await loadProjects();
+  } catch (error) {
+    setUploadStatus(error.message, "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function deleteProject(projectId, button) {
+  button.disabled = true;
+  try {
+    await apiFetch(`/api/v1/projects/${encodeURIComponent(projectId)}`, { method: "DELETE" });
+    if (currentProjectId === projectId) {
+      currentProjectId = "";
+      currentConversationId = null;
+      currentMessages = [];
+      renderEmptyState();
+    }
+    await loadProjects();
+    setUploadStatus("项目已删除", "success");
+  } catch (error) {
+    setUploadStatus(error.message, "error");
+    button.disabled = false;
+  }
+}
+
 /* ═══════════════════════════════════════════
    History
    ═══════════════════════════════════════════ */
 async function loadHistory() {
   try {
-    const data = await apiFetch("/api/v1/queries?page=1&page_size=30");
+    const params = currentProjectId
+      ? `?project_id=${encodeURIComponent(currentProjectId)}&page_size=30`
+      : "?page=1&page_size=30";
+    const data = await apiFetch(`/api/v1/queries${params}`);
     historyCount.textContent = data.total ? String(data.total) : "";
     renderHistory(data.items);
   } catch (error) {
@@ -293,13 +421,8 @@ historyList.addEventListener("click", async (event) => {
     const data = await apiFetch(`/api/v1/queries/${encodeURIComponent(historyItem.conversation_id || historyItem.id)}`);
     currentConversationId = historyItem.conversation_id || historyItem.id;
     currentMessages = data.items;
-    const documentId = historyItem.document_ids?.[0] || data.items[0]?.document_ids?.[0] || "";
-    if (documentId && documentsById.has(documentId)) {
-      selectedDocumentId = documentId;
-      renderDocuments({ items: [...documentsById.values()] });
-    } else {
-      updateActiveDocumentStatus();
-    }
+    currentProjectId = historyItem.project_id || currentProjectId;
+    updateActiveDocumentStatus();
     renderConversation();
     setStatus("历史对话");
   } catch (error) {
@@ -347,7 +470,12 @@ queryForm.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         question,
         conversation_id: currentConversationId,
-        document_id: selectedDocumentId || null,
+        project_id: currentProjectId || null,
+        document_ids: currentProjectId
+          ? null
+          : [...documentsById.values()]
+              .filter((doc) => doc.status === "completed")
+              .map((doc) => doc.id),
         top_k: Number(topKInput.value || 5),
       }),
     });
@@ -374,7 +502,18 @@ queryForm.addEventListener("submit", async (event) => {
 });
 
 /* ─── New conversation ─── */
-refreshDocuments.addEventListener("click", loadDocuments);
+refreshDocuments.addEventListener("click", async () => {
+  await loadDocuments();
+  await loadProjects();
+  if (currentProjectId) await loadHistory();
+});
+backToProjects.addEventListener("click", () => {
+  currentProjectId = "";
+  currentConversationId = null;
+  currentMessages = [];
+  renderProjectView();
+  renderEmptyState();
+});
 newConversation.addEventListener("click", () => {
   currentConversationId = null;
   currentMessages = [];
@@ -487,9 +626,10 @@ function renderDocumentNames(ids) {
 }
 
 function updateActiveDocumentStatus() {
-  const name = selectedDocumentId
-    ? documentsById.get(selectedDocumentId)?.filename || "已选择文档"
-    : "全部文档";
+  const project = projectsById.get(currentProjectId);
+  const name = project
+    ? `${project.name} · ${project.document_count} 个文档`
+    : "全部已索引文档";
   setStatus(`范围：${name}`);
 }
 
@@ -617,5 +757,6 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 /* ─── Init ─── */
 (async function initialize() {
-  await Promise.all([loadDocuments(), loadHistory()]);
+  await loadDocuments();
+  await loadProjects();
 })();

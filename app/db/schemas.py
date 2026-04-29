@@ -44,10 +44,31 @@ class DeleteResponse(BaseModel):
     deleted: bool
 
 
+class ProjectCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    document_ids: list[str] = Field(min_length=1)
+
+
+class ProjectSummary(BaseModel):
+    id: str
+    name: str
+    document_ids: list[str] = Field(default_factory=list)
+    document_count: int = 0
+    created_at: str
+    updated_at: str
+
+
+class ProjectListResponse(BaseModel):
+    items: list[ProjectSummary]
+    total: int
+
+
 class QueryRequest(BaseModel):
     question: str = Field(min_length=1)
     conversation_id: str | None = None
     document_id: str | None = None
+    document_ids: list[str] | None = None
+    project_id: str | None = None
     top_k: int | None = Field(default=None, ge=1, le=20)
     score_threshold: float | None = Field(default=None, ge=0)
 
@@ -75,6 +96,7 @@ class QueryResponse(BaseModel):
 class QueryLogSummary(BaseModel):
     id: str
     conversation_id: str | None = None
+    project_id: str | None = None
     question: str
     answer: str
     citations: list[Citation]

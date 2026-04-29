@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import json
+from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
 from app.db.database import (
+    create_project,
     delete_document,
+    delete_project,
     get_document,
     get_job,
+    get_project,
     list_documents,
+    list_projects,
 )
 from app.db.schemas import (
     DeleteResponse,
@@ -16,6 +21,9 @@ from app.db.schemas import (
     DocumentListResponse,
     DocumentUploadResponse,
     JobDetail,
+    ProjectCreateRequest,
+    ProjectListResponse,
+    ProjectSummary,
 )
 from app.ingest.pipeline import (
     ingest_upload,
@@ -90,3 +98,50 @@ def job_detail(job_id: str) -> JobDetail:
     if row is None:
         raise HTTPException(status_code=404, detail="Job not found")
     return JobDetail(**row)
+
+
+@router.post("/projects", response_model=ProjectSummary)
+def create_knowledge_project(request: ProjectCreateRequest) -> ProjectSummary:
+    name = request.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Project name is required")
+    missing_ids = [
+        document_id
+        for document_id in request.document_ids
+        if get_document(document_id) is None
+    ]
+    if missing_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Documents not found: {', '.join(missing_ids)}",
+        )
+
+    project_id = f"project_{uuid4().hex}"
+    create_project(
+        project_id=project_id,
+        name=name,
+        document_ids=request.document_ids,
+    )
+    project = get_project(project_id)
+    return ProjectSummary(**project)
+
+
+@router.get("/projects", response_model=ProjectListResponse)
+def projects() -> ProjectListResponse:
+    return ProjectListResponse(**list_projects())
+
+
+@router.get("/projects/{project_id}", response_model=ProjectSummary)
+def project_detail(project_id: str) -> ProjectSummary:
+    project = get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return ProjectSummary(**project)
+
+
+@router.delete("/projects/{project_id}", response_model=DeleteResponse)
+def remove_project(project_id: str) -> DeleteResponse:
+    deleted = delete_project(project_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return DeleteResponse(deleted=deleted)

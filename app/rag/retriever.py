@@ -11,7 +11,11 @@ async def retrieve(
     top_k: int,
     score_threshold: float,
     document_id: str | None = None,
+    document_ids: list[str] | None = None,
 ) -> list[dict]:
+    if document_ids is not None and not document_ids:
+        return []
+
     embedding_provider = get_embedding_provider()
     vector_store = get_vector_store()
     query_vector = (await embedding_provider.embed_texts([question]))[0]
@@ -21,6 +25,7 @@ async def retrieve(
         top_k=candidate_k,
         score_threshold=score_threshold,
         document_id=document_id,
+        document_ids=document_ids,
     )
     chunk_ids = [hit["payload"]["chunk_id"] for hit in hits]
     chunks = get_chunks_by_ids(chunk_ids)
