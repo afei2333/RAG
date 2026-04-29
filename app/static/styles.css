@@ -755,6 +755,24 @@ a:hover { text-decoration: underline; }
 .markdown-body pre code { background: transparent; color: inherit; padding: 0; }
 .markdown-body strong { font-weight: 600; }
 
+.math-block {
+  max-width: 100%;
+  margin: 14px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+
+.markdown-body mjx-container {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.markdown-body mjx-container[jax="SVG"][display="true"] {
+  margin: 10px 0;
+}
+
 .markdown-figure {
   display: grid;
   margin: 14px 0;

@@ -388,6 +388,7 @@ newConversation.addEventListener("click", () => {
 function renderConversation() {
   if (!currentMessages.length) { renderEmptyState(); return; }
   conversation.innerHTML = currentMessages.map(renderExchange).join("");
+  typesetMath(conversation);
   conversation.scrollTop = conversation.scrollHeight;
 }
 
@@ -498,7 +499,7 @@ function updateActiveDocumentStatus() {
 function renderMarkdown(value) {
   const lines = String(value ?? "").split(/\r?\n/);
   const blocks = [];
-  let paragraph = [], list = [], inCode = false, codeLines = [];
+  let paragraph = [], list = [], inCode = false, codeLines = [], inMath = false, mathLines = [];
 
   const flush = () => {
     if (paragraph.length) { blocks.push(`<p>${renderInlineMarkdown(paragraph.join(" "))}</p>`); paragraph = []; }
@@ -512,6 +513,31 @@ function renderMarkdown(value) {
       continue;
     }
     if (inCode) { codeLines.push(line); continue; }
+    if (inMath) {
+      if (line.trim().endsWith("$$")) {
+        const content = line.trim() === "$$" ? "" : line.trim().slice(0, -2);
+        if (content) mathLines.push(content);
+        blocks.push(renderMathBlock(mathLines.join("\n")));
+        mathLines = [];
+        inMath = false;
+      } else {
+        mathLines.push(line);
+      }
+      continue;
+    }
+    if (line.trim().startsWith("$$")) {
+      flush();
+      const remainder = line.trim().slice(2);
+      if (remainder.endsWith("$$") && remainder.length > 2) {
+        blocks.push(renderMathBlock(remainder.slice(0, -2)));
+      } else if (remainder) {
+        inMath = true;
+        mathLines.push(remainder);
+      } else {
+        inMath = true;
+      }
+      continue;
+    }
     const image = line.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
     if (image) {
       flush();
@@ -528,8 +554,13 @@ function renderMarkdown(value) {
   }
 
   if (inCode) blocks.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+  if (inMath) blocks.push(renderMathBlock(mathLines.join("\n")));
   flush();
   return blocks.join("");
+}
+
+function renderMathBlock(value) {
+  return `<div class="math-block">$$${escapeHtml(value)}$$</div>`;
 }
 
 function renderMarkdownImage(url, alt) {
@@ -548,6 +579,11 @@ function renderInlineMarkdown(value) {
   html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
   return html;
+}
+
+function typesetMath(root) {
+  if (!window.MathJax?.typesetPromise) return;
+  window.MathJax.typesetPromise([root]).catch(() => {});
 }
 
 /* ═══════════════════════════════════════════
