@@ -554,12 +554,6 @@ function renderEmptyState() {
   currentMessages = [];
   conversation.innerHTML = `
     <div class="empty-state">
-      <div class="empty-icon">
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-          <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
-          <path d="M13 20h14M20 13v14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
-        </svg>
-      </div>
       <h3>今天想查点什么？</h3>
       <p>从左侧上传知识文件，然后直接提问。回答会带上引用来源，方便核对依据。</p>
       <div class="hint-chips">
