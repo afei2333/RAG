@@ -109,7 +109,7 @@ async function loadDocuments() {
   try {
     const data = await apiFetch("/api/v1/documents?page=1&page_size=50");
     documentsById = new Map(data.items.map((d) => [d.id, d]));
-    renderProjectView();
+    renderCurrentSideView();
   } catch (error) {
     documentList.innerHTML = `<div class="muted-box" style="color:#c03a2b">${escapeHtml(error.message)}</div>`;
   } finally {
@@ -122,7 +122,20 @@ async function loadDocuments() {
 async function loadProjects() {
   const data = await apiFetch("/api/v1/projects");
   projectsById = new Map(data.items.map((item) => [item.id, item]));
-  renderProjectView();
+  if (currentProjectId && !projectsById.has(currentProjectId)) {
+    currentProjectId = "";
+    currentConversationId = null;
+    currentMessages = [];
+  }
+  renderCurrentSideView();
+}
+
+function renderCurrentSideView() {
+  if (currentProjectId && projectsById.has(currentProjectId)) {
+    renderHistoryView();
+  } else {
+    renderProjectView();
+  }
 }
 
 function renderProjectView() {
@@ -183,7 +196,7 @@ function renderProjectItem(project, index) {
           <span class="document-meta">${escapeHtml(project.document_count)} 个文档 · ${escapeHtml(meta)}</span>
         </button>
       </div>
-      <button class="ghost-button" type="button" data-delete-project="${escapeHtml(project.id)}" title="删除项目">×</button>
+      <button class="project-delete-button" type="button" data-delete-project="${escapeHtml(project.id)}" title="删除项目">删除</button>
     </article>`;
 }
 
@@ -193,6 +206,7 @@ function renderHistoryView() {
   historySection.classList.remove("is-hidden");
   historyTitle.textContent = project?.name || "对话历史";
   updateActiveDocumentStatus();
+  updateComposerState();
 }
 
 /* ─── Upload ─── */
@@ -449,6 +463,11 @@ questionInput.addEventListener("input", () => {
 
 queryForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!currentProjectId || !projectsById.has(currentProjectId)) {
+    setStatus("请先进入一个项目");
+    renderEmptyState();
+    return;
+  }
   const question = questionInput.value.trim();
   if (!question) {
     setStatus("请先输入问题");
@@ -470,12 +489,8 @@ queryForm.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         question,
         conversation_id: currentConversationId,
-        project_id: currentProjectId || null,
-        document_ids: currentProjectId
-          ? null
-          : [...documentsById.values()]
-              .filter((doc) => doc.status === "completed")
-              .map((doc) => doc.id),
+        project_id: currentProjectId,
+        document_ids: null,
         top_k: Number(topKInput.value || 5),
       }),
     });
@@ -515,6 +530,11 @@ backToProjects.addEventListener("click", () => {
   renderEmptyState();
 });
 newConversation.addEventListener("click", () => {
+  if (!currentProjectId || !projectsById.has(currentProjectId)) {
+    setStatus("请先进入一个项目");
+    renderEmptyState();
+    return;
+  }
   currentConversationId = null;
   currentMessages = [];
   renderEmptyState();
@@ -552,10 +572,11 @@ function renderExchange(exchange) {
 
 function renderEmptyState() {
   currentMessages = [];
+  const hasProject = Boolean(currentProjectId && projectsById.has(currentProjectId));
   conversation.innerHTML = `
     <div class="empty-state">
-      <h3>今天想查点什么？</h3>
-      <p>从左侧上传知识文件，然后直接提问。回答会带上引用来源，方便核对依据。</p>
+      <h3>${hasProject ? "今天想查点什么？" : "先进入一个项目"}</h3>
+      <p>${hasProject ? "在当前项目范围内提问，回答会带上引用来源，方便核对依据。" : "从左侧上传并索引文件，创建项目后进入项目，才能开始对话。"}</p>
       <div class="hint-chips">
         <span class="chip">📄 支持 PDF、Word、Markdown</span>
         <span class="chip">🔗 引用溯源</span>
@@ -625,8 +646,22 @@ function updateActiveDocumentStatus() {
   const project = projectsById.get(currentProjectId);
   const name = project
     ? `${project.name} · ${project.document_count} 个文档`
-    : "全部已索引文档";
+    : "请选择项目后开始对话";
   setStatus(`范围：${name}`);
+  updateComposerState();
+}
+
+function updateComposerState() {
+  const hasProject = Boolean(currentProjectId && projectsById.has(currentProjectId));
+  const sendButton = queryForm.querySelector(".send-button");
+  queryForm.classList.toggle("is-locked", !hasProject);
+  questionInput.disabled = !hasProject;
+  topKInput.disabled = !hasProject;
+  if (sendButton) sendButton.disabled = !hasProject;
+  newConversation.disabled = !hasProject;
+  questionInput.placeholder = hasProject
+    ? "向当前项目提问… （Enter 发送，Shift+Enter 换行）"
+    : "进入项目后开始对话";
 }
 
 /* ═══════════════════════════════════════════

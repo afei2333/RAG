@@ -56,7 +56,7 @@
         <!-- History -->
         <section class="side-section history-section is-hidden" id="historySection">
           <div class="section-header">
-            <button id="backToProjects" class="back-button" type="button">← 项目</button>
+            <button id="backToProjects" class="back-button" type="button">← </button>
             <h2 class="section-label" id="historyTitle">对话历史</h2>
             <span id="historyCount" class="history-badge"></span>
           </div>
@@ -81,8 +81,8 @@
 
         <section id="conversation" class="conversation">
           <div class="empty-state">
-            <h3>今天想查点什么？</h3>
-            <p>从左侧上传知识文件，然后直接提问。回答会带上引用来源，方便核对依据。</p>
+            <h3>选择项目，让我们开始...</h3>
+            <p>从左侧上传并索引文件，创建项目后选择项目，再开始对话。</p>
             <div class="hint-chips">
               <span class="chip">📄 支持 PDF、Word、Markdown</span>
               <span class="chip">🔗 引用溯源</span>
@@ -92,8 +92,8 @@
         </section>
 
         <div class="composer-wrapper">
-          <form id="queryForm" class="composer">
-            <textarea id="questionInput" rows="2" placeholder="向知识库提问… （Enter 发送，Shift+Enter 换行）"></textarea>
+          <form id="queryForm" class="composer is-locked">
+            <textarea id="questionInput" rows="2" placeholder="进入项目后开始对话" disabled></textarea>
             <div class="composer-footer">
               <label class="topk-control" title="检索段落数量">
                 <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -101,9 +101,9 @@
                   <path d="M1 11.5c.8-2 2.8-3 5-3s4.2 1 5 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                 </svg>
                 <span>Top‑K</span>
-                <input id="topKInput" type="number" min="1" max="20" value="5" />
+                <input id="topKInput" type="number" min="1" max="20" value="5" disabled />
               </label>
-              <button class="send-button" type="submit" id="sendBtn">
+              <button class="send-button" type="submit" id="sendBtn" disabled>
                 <span class="send-label">发送</span>
                 <svg class="send-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
                   <path d="M13 7.5H2M8.5 3 13 7.5 8.5 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>

@@ -478,6 +478,23 @@ a:hover { text-decoration: underline; }
 
 .ghost-button:hover { background: rgba(192,58,43,.1); color: #c03a2b; }
 
+.project-delete-button {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 6px;
+  color: #a33a2b;
+  background: rgba(192,58,43,.08);
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.project-delete-button:hover:not(:disabled) {
+  background: rgba(192,58,43,.15);
+  color: #7f281f;
+}
+
 /* ── History ── */
 .history-badge {
   font-size: 11px;
@@ -1062,6 +1079,12 @@ a:hover { text-decoration: underline; }
   box-shadow: var(--shadow-md), 0 0 0 3px rgba(193,68,14,.10);
 }
 
+.composer.is-locked {
+  border-color: var(--line);
+  background: rgba(237,232,221,.72);
+  box-shadow: none;
+}
+
 .composer textarea {
   width: 100%;
   min-height: 72px;
@@ -1076,6 +1099,10 @@ a:hover { text-decoration: underline; }
 }
 
 .composer textarea::placeholder { color: var(--muted); font-style: italic; font-size: 13.5px; }
+
+.composer.is-locked textarea {
+  color: var(--muted);
+}
 
 .composer-footer {
   display: flex;
