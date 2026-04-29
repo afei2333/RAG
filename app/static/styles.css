@@ -755,6 +755,28 @@ a:hover { text-decoration: underline; }
 .markdown-body pre code { background: transparent; color: inherit; padding: 0; }
 .markdown-body strong { font-weight: 600; }
 
+.markdown-figure {
+  display: grid;
+  margin: 14px 0;
+}
+
+.markdown-figure a {
+  display: block;
+  width: min(100%, 640px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fffdf8;
+  overflow: hidden;
+}
+
+.markdown-figure img {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  background: #fffdf8;
+}
+
 /* ── Citations ── */
 .citations {
   width: min(820px, 100%);

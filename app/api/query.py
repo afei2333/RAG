@@ -63,6 +63,7 @@ async def query_knowledge_base(request: QueryRequest) -> QueryResponse:
         )
         answer = await get_llm_provider().generate(messages)
         citations = [_citation_from_chunk(chunk) for chunk in limited_contexts]
+        answer = _append_inline_figures(answer, citations)
 
     query_id = f"query_{uuid4().hex}"
     document_ids = sorted(
@@ -106,6 +107,41 @@ def _citation_from_chunk(chunk: dict) -> dict:
         "caption": metadata.get("caption") if content_type == "figure" else None,
         "text": chunk["content"][:500],
     }
+
+
+def _append_inline_figures(answer: str, citations: list[dict]) -> str:
+    figures = []
+    seen_urls = set()
+    for citation in citations:
+        image_url = citation.get("image_url")
+        if not image_url or image_url in seen_urls:
+            continue
+        seen_urls.add(image_url)
+        figures.append(citation)
+
+    if not figures:
+        return answer
+
+    figure_blocks = ["### 相关图片"]
+    for index, figure in enumerate(figures[:3], start=1):
+        caption = figure.get("caption") or f"相关图片 {index}"
+        page = f"第 {figure['page_number']} 页" if figure.get("page_number") else ""
+        source = figure.get("source_name") or "来源文档"
+        description = " · ".join(part for part in [source, page, caption] if part)
+        figure_blocks.append(
+            "\n".join(
+                [
+                    f"![{_escape_markdown_alt(caption)}]({figure['image_url']})",
+                    f"*{description}*",
+                ]
+            )
+        )
+
+    return f"{answer.rstrip()}\n\n" + "\n\n".join(figure_blocks)
+
+
+def _escape_markdown_alt(value: str) -> str:
+    return value.replace("[", "(").replace("]", ")").replace("\n", " ").strip()
 
 
 @router.get("/queries", response_model=QueryLogListResponse)

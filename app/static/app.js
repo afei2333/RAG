@@ -402,7 +402,7 @@ function renderExchange(exchange) {
         <div class="message-label">回答</div>
         <div class="message-body markdown-body">
           ${exchange.loading
-            ? '<span class="loader">生成中</span>'
+            ? '<span class="loader">emmm，让我看一下文档</span>'
             : renderMarkdown(exchange.answer)}
         </div>
       </article>
@@ -512,6 +512,12 @@ function renderMarkdown(value) {
       continue;
     }
     if (inCode) { codeLines.push(line); continue; }
+    const image = line.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
+    if (image) {
+      flush();
+      blocks.push(renderMarkdownImage(image[2], image[1]));
+      continue;
+    }
     const heading = line.match(/^(#{1,3})\s+(.+)$/);
     if (heading) { flush(); blocks.push(`<h${heading[1].length + 2}>${renderInlineMarkdown(heading[2])}</h${heading[1].length + 2}>`); continue; }
     const bullet = line.match(/^\s*[-*]\s+(.+)$/);
@@ -524,6 +530,15 @@ function renderMarkdown(value) {
   if (inCode) blocks.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
   flush();
   return blocks.join("");
+}
+
+function renderMarkdownImage(url, alt) {
+  return `
+    <figure class="markdown-figure">
+      <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">
+        <img src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" loading="lazy">
+      </a>
+    </figure>`;
 }
 
 function renderInlineMarkdown(value) {
