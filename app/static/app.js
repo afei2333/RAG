@@ -565,8 +565,8 @@ function renderExchange(exchange) {
       <article class="message message-answer${exchange.error ? " message-error" : ""}">
         <div class="message-label">回答</div>
         <div class="message-body markdown-body">
-          ${exchange.loading
-            ? '<span class="loader">emmm，让我看一下文档</span>'
+          ${exchange.loading && !exchange.answer
+            ? '<span class="loader">emmm，让我查一下知识库</span>'
             : renderMarkdown(exchange.answer)}
         </div>
       </article>
@@ -672,9 +672,9 @@ function updateComposerState() {
    Markdown renderer
    ═══════════════════════════════════════════ */
 function renderMarkdown(value) {
-  const lines = String(value ?? "").split(/\r?\n/);
+  const lines = normalizeMarkdownBlocks(value).split(/\r?\n/);
   const blocks = [];
-  let paragraph = [], list = [], inCode = false, codeLines = [], inMath = false, mathLines = [];
+  let paragraph = [], list = [], inCode = false, codeLang = "", codeLines = [], inMath = false, mathLines = [], mathEnd = "$$";
 
   const flush = () => {
     if (paragraph.length) { blocks.push(`<p>${renderInlineMarkdown(paragraph.join(" "))}</p>`); paragraph = []; }
@@ -684,33 +684,49 @@ function renderMarkdown(value) {
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     if (line.trim().startsWith("```")) {
-      if (inCode) { blocks.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`); codeLines = []; inCode = false; }
-      else { flush(); inCode = true; }
+      if (inCode) {
+        blocks.push(renderCodeBlock(codeLines.join("\n"), codeLang));
+        codeLines = [];
+        codeLang = "";
+        inCode = false;
+      }
+      else {
+        flush();
+        inCode = true;
+        codeLang = line.trim().slice(3).trim().toLowerCase();
+      }
       continue;
     }
     if (inCode) { codeLines.push(line); continue; }
     if (inMath) {
-      if (line.trim().endsWith("$$")) {
-        const content = line.trim() === "$$" ? "" : line.trim().slice(0, -2);
+      if (line.trim().endsWith(mathEnd)) {
+        const content = line.trim() === mathEnd ? "" : line.trim().slice(0, -mathEnd.length);
         if (content) mathLines.push(content);
-        blocks.push(renderMathBlock(mathLines.join("\n")));
+        if (mathLines.some((mathLine) => mathLine.trim())) {
+          blocks.push(renderMathBlock(mathLines.join("\n")));
+        }
         mathLines = [];
         inMath = false;
+        mathEnd = "$$";
       } else {
         mathLines.push(line);
       }
       continue;
     }
-    if (line.trim().startsWith("$$")) {
+    const displayMathStart = line.trim().startsWith("$$") ? "$$" : (line.trim().startsWith("\\[") ? "\\[" : "");
+    if (displayMathStart) {
       flush();
-      const remainder = line.trim().slice(2);
-      if (remainder.endsWith("$$") && remainder.length > 2) {
-        blocks.push(renderMathBlock(remainder.slice(0, -2)));
+      const endToken = displayMathStart === "$$" ? "$$" : "\\]";
+      const remainder = line.trim().slice(displayMathStart.length);
+      if (remainder.endsWith(endToken) && remainder.length > endToken.length) {
+        blocks.push(renderMathBlock(remainder.slice(0, -endToken.length)));
       } else if (remainder) {
         inMath = true;
+        mathEnd = endToken;
         mathLines.push(remainder);
       } else {
         inMath = true;
+        mathEnd = endToken;
       }
       continue;
     }
@@ -718,6 +734,9 @@ function renderMarkdown(value) {
     if (image) {
       flush();
       blocks.push(renderMarkdownImage(image[2], image[1]));
+      continue;
+    }
+    if (/^(?:\[\d+\]\s*)+$/.test(line.trim())) {
       continue;
     }
     if (isMarkdownTableStart(lines, index)) {
@@ -745,14 +764,54 @@ function renderMarkdown(value) {
     paragraph.push(line.trim());
   }
 
-  if (inCode) blocks.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
-  if (inMath) blocks.push(renderMathBlock(mathLines.join("\n")));
+  if (inCode) blocks.push(renderCodeBlock(codeLines.join("\n"), codeLang));
+  if (inMath && mathLines.some((mathLine) => mathLine.trim())) {
+    blocks.push(renderMathBlock(mathLines.join("\n")));
+  }
   flush();
   return blocks.join("");
 }
 
+function normalizeMarkdownBlocks(value) {
+  const imagePattern = /!\[[^\]\n]*\]\([^)\s]+\)/g;
+  const text = String(value ?? "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/([^\n#])([ \t]+)(#{1,6}\s+)/g, "$1\n\n$3")
+    .replace(imagePattern, (match) => `\n\n${match}\n\n`)
+    .replace(/^(#{1,6}[^\n]*?)[ \t]+([-*][ \t]+(?=(?:\*\*)?\S))/gm, "$1\n\n$2")
+    .replace(/(\[\d+\]\s+)([-*][ \t]+(?=\*\*\S))/g, "$1\n$2")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  const displayFenceCount = (text.match(/\$\$/g) || []).length;
+  return displayFenceCount % 2 === 1 ? text.replace(/\s*\$\$\s*$/, "") : text;
+}
+
 function renderMathBlock(value) {
   return `<div class="math-block">$$${escapeHtml(value)}$$</div>`;
+}
+
+function renderCodeBlock(value, lang = "") {
+  const normalizedLang = String(lang || "").toLowerCase();
+  if (/^(math|latex|tex|katex)$/.test(normalizedLang) || looksLikeDisplayMath(value)) {
+    return renderMathBlock(stripMathDelimiters(value));
+  }
+  return `<pre><code>${escapeHtml(value)}</code></pre>`;
+}
+
+function looksLikeDisplayMath(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return false;
+  if ((text.startsWith("$$") && text.endsWith("$$")) || (text.startsWith("\\[") && text.endsWith("\\]"))) {
+    return true;
+  }
+  return /\\(frac|sum|int|begin|alpha|beta|gamma|theta|lambda|mu|sigma|mathbf|mathrm)\b/.test(text);
+}
+
+function stripMathDelimiters(value) {
+  let text = String(value ?? "").trim();
+  if (text.startsWith("$$") && text.endsWith("$$")) return text.slice(2, -2).trim();
+  if (text.startsWith("\\[") && text.endsWith("\\]")) return text.slice(2, -2).trim();
+  return text;
 }
 
 function renderMarkdownImage(url, alt) {
@@ -761,6 +820,7 @@ function renderMarkdownImage(url, alt) {
       <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">
         <img src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" loading="lazy">
       </a>
+      ${alt ? `<figcaption>${renderInlineMarkdown(alt)}</figcaption>` : ""}
     </figure>`;
 }
 

@@ -62,6 +62,12 @@ def main() -> None:
     print(f"  llm_base_url={settings.cloud_llm_base_url}")
     print(f"  llm_model={settings.cloud_llm_model}")
     print(f"  llm_api_key={mask(settings.cloud_llm_api_key)}")
+    print(f"  llm_stream={settings.cloud_llm_stream}")
+    print(f"  llm_stream_include_usage={settings.cloud_llm_stream_include_usage}")
+    print(f"  llm_enable_thinking={settings.cloud_llm_enable_thinking}")
+    print(f"  llm_reasoning_effort={settings.cloud_llm_reasoning_effort or '<unset>'}")
+    print(f"  llm_max_tokens={settings.cloud_llm_max_tokens}")
+    print(f"  llm_top_p={settings.cloud_llm_top_p}")
 
     if settings.embedding_backend == "cloud" and settings.cloud_embedding_api_key in {"", "replace_me"}:
         print()

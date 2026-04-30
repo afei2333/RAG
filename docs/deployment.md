@@ -73,6 +73,12 @@ CLOUD_EMBEDDING_BASE_URL=https://api.openai.com/v1
 CLOUD_EMBEDDING_MODEL=text-embedding-3-small
 CLOUD_LLM_BASE_URL=https://api.openai.com/v1
 CLOUD_LLM_MODEL=gpt-4.1-mini
+CLOUD_LLM_STREAM=true
+CLOUD_LLM_STREAM_INCLUDE_USAGE=false
+CLOUD_LLM_ENABLE_THINKING=
+CLOUD_LLM_REASONING_EFFORT=
+CLOUD_LLM_MAX_TOKENS=
+CLOUD_LLM_TOP_P=
 ```
 
 也可以直接复制云端模板：
@@ -93,6 +99,11 @@ Embedding 和 LLM 可以分别选择后端，不要求都用 Ollama 或都用云
 - `EMBEDDING_BACKEND=cloud` 时，使用 `CLOUD_EMBEDDING_BASE_URL`、`CLOUD_EMBEDDING_MODEL` 和 `CLOUD_EMBEDDING_API_KEY`。
 - `LLM_BACKEND=ollama` 时，使用 `OLLAMA_LLM_MODEL`。
 - `LLM_BACKEND=cloud` 时，使用 `CLOUD_LLM_BASE_URL`、`CLOUD_LLM_MODEL` 和 `CLOUD_LLM_API_KEY`。
+- `CLOUD_LLM_STREAM=true` 时，前端走 `/api/v1/query/stream` 实时显示回答。
+- `CLOUD_LLM_STREAM_INCLUDE_USAGE=true` 时，会按 SCNet OpenAI Chat API 文档传 `stream_options={"include_usage": true}`，在流式输出最后包含 Token 用量。
+- `CLOUD_LLM_ENABLE_THINKING=true/false` 对应 SCNet 的 `enable_thinking`，适用于 Qwen3 系列和 DeepSeek-V4 系列模型；留空则不传该字段。
+- `CLOUD_LLM_REASONING_EFFORT=high|max` 对应 SCNet 的 `reasoning_effort`，仅适用于 DeepSeek-V4 系列模型；留空则不传该字段。
+- `CLOUD_LLM_MAX_TOKENS` 和 `CLOUD_LLM_TOP_P` 会分别映射到 OpenAI Chat 请求体中的 `max_tokens` 和 `top_p`。
 - 如果两者使用同一个 key，可以只设置 `CLOUD_API_KEY`，不填单独的 key。
 - 如果两者 key 也不同，就分别设置 `CLOUD_EMBEDDING_API_KEY` 和 `CLOUD_LLM_API_KEY`。
 - 同一个知识库中，文档入库和提问必须使用同一个 embedding 模型。

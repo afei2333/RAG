@@ -25,11 +25,39 @@ def _get_int(name: str, default: int) -> int:
     return int(raw_value)
 
 
+def _get_optional_int(name: str) -> int | None:
+    raw_value = os.getenv(name)
+    if raw_value is None or raw_value.strip() == "":
+        return None
+    return int(raw_value)
+
+
 def _get_float(name: str, default: float) -> float:
     raw_value = os.getenv(name)
     if raw_value is None:
         return default
     return float(raw_value)
+
+
+def _get_optional_float(name: str) -> float | None:
+    raw_value = os.getenv(name)
+    if raw_value is None or raw_value.strip() == "":
+        return None
+    return float(raw_value)
+
+
+def _get_bool(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _get_optional_bool(name: str) -> bool | None:
+    raw_value = os.getenv(name)
+    if raw_value is None or raw_value.strip() == "":
+        return None
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _get_env(name: str, default: str) -> str:
@@ -91,6 +119,12 @@ class Settings:
         "CLOUD_LLM_MODEL",
         "gpt-4.1-mini",
     )
+    cloud_llm_stream: bool = _get_bool("CLOUD_LLM_STREAM", True)
+    cloud_llm_stream_include_usage: bool = _get_bool("CLOUD_LLM_STREAM_INCLUDE_USAGE", False)
+    cloud_llm_enable_thinking: bool | None = _get_optional_bool("CLOUD_LLM_ENABLE_THINKING")
+    cloud_llm_reasoning_effort: str = _get_env("CLOUD_LLM_REASONING_EFFORT", "")
+    cloud_llm_max_tokens: int | None = _get_optional_int("CLOUD_LLM_MAX_TOKENS")
+    cloud_llm_top_p: float | None = _get_optional_float("CLOUD_LLM_TOP_P")
 
     default_top_k: int = _get_int("DEFAULT_TOP_K", 5)
     default_score_threshold: float = _get_float("DEFAULT_SCORE_THRESHOLD", 0.2)
